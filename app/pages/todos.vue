@@ -10,7 +10,10 @@ import { Switch } from '@headlessui/vue'
 const { data } = await useFetch("/api/todos");
 
 const inputValue = ref("");
-const todolist = ref(data.value || []);
+const todoList = ref(data.value || []);
+const todos = computed(() =>
+  todoList.value.filter(todo => !todo.isSoftDelete)
+);
 
 function formatTime(createAt) {
     const dateNow = new Date();
@@ -40,7 +43,7 @@ const handleAdd = async () => {
         body: { name: inputValue.value }
         });
         
-        todolist.value.push(res);
+        todoList.value.push(res);
     } catch (err) {
         console.error(err);
     }
@@ -48,20 +51,12 @@ const handleAdd = async () => {
     inputValue.value = "";
 };
 
-const handleUpdate=(id)=>{
-    const newName = prompt("Enter the new name for the todo item:");
-    if (newName) {
-        const index = todolist.value.findIndex(value => value.id === id);
-        todolist.value[index].name = newName;
-    }
-}
-
 const handleDelete = async(id)=>{
     try {
         await $fetch(`/api/todos/${id}`, {
             method: "DELETE"
         });
-        todolist.value = todolist.value.filter(value => value.id !== id);
+        todoList.value = todoList.value.filter(value => value.id !== id);
     } catch (err) {
         console.error(err);
     }
@@ -71,13 +66,27 @@ const handleNewList = async()=>{
     if (!confirm("Bạn có chắc muốn xóa tất cả?")) return;
     try {
         await $fetch(`/api/todos`, {
-            method: "DELETE"
+            method: "PATCH"
         });
-        todolist.value = [];
+        todoList.value = [];
     } catch (err) {
         console.error(err);
     }
-}
+}  
+
+const handleToggleCompleted = async (id, completed) => {
+  try {
+    await $fetch(`/api/todos/${id}`, {
+      method: "PATCH",
+      body: { completed }
+    });
+    const todo = todoList.value.find(item => item.id === id);
+    console.log("🚀 ~ handleToggleCompleted ~ todo:", todo?.completed)
+    if (todo) todo.completed = completed;
+  } catch (err) {
+    console.error(err);
+  }
+}; 
 </script>
 
 <template>
@@ -103,11 +112,10 @@ const handleNewList = async()=>{
         </div>
         <ul>
             <li 
-                v-for="(value, index) in todolist" :key="value.id" :class="['flex justify-between items-center', index === todolist.length - 1 ? '' : 'border-b border-gray-800']">
+                v-for="(value, index) in todos" :key="value.id" :class="['flex justify-between items-center', index === todos.length - 1 ? '' : 'border-b border-gray-800']">
                 <div>
                     <div class="flex items-center space-x-4">
                         <h2 class="text-xl font-bold" :class="{ 'line-through text-gray-500': value.completed }">{{ value.name }}</h2>
-                        <button @click="handleUpdate(value.id)">Update</button>
                     </div>
                     <div>{{formatTime(value.dataCreated)}}</div>
                 </div>
@@ -115,6 +123,7 @@ const handleNewList = async()=>{
     
                     <Switch
                         v-model="value.completed"
+                        @update:model-value="state => handleToggleCompleted(value.id, state)"
                         :class="value.completed ? 'bg-blue-500' : 'bg-gray-500'"
                         class="relative inline-flex h-6 w-11 items-center rounded-full"
                     >

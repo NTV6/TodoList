@@ -8,6 +8,7 @@ export default defineEventHandler(async (event) => {
         id: crypto.randomUUID(),
         name: body.name,
         completed: false,
+        isSoftDelete: false,
         dataCreated: new Date()
     };
 
